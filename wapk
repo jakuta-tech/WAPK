@@ -1,0 +1,97 @@
+#!/bin/bash
+####
+#### Copyright (C) 2019  wuseman <wuseman@nr1.nu> - All Rights Reserved
+#### Created: 2019-02-19
+####
+
+usage() {
+cat << EOF
+
+wadb-extractor.sh is a tool for facialiate the work with apk files from command-line
+
+   where:
+       -c|--compress    | Repack your modded apk files 
+       -e|--extract     | Extract any APK file
+       -h|--help        | Print this help and exit
+       -s|--sign        | Sign APK file
+
+EOF
+}
+
+
+key() {
+
+     if [[ ! -f $HOME/.wapk/wapk.keystore ]]; then
+           printf "You must create a key to sign the apk..\n"
+           mkdir -p ~/.andrid/
+           keytool -genkey -v -keystore wapk.keystore -alias wapk  -keyalg RSA -keysize 4096 -validity 10000
+fi
+}
+
+extractapk() {
+key
+read -p "APK To extract: " apk
+if [[ -z $apk ]]; then
+    printf "You must provide a real .apk file..\n"
+else
+    printf "Extracting $apk, please wait\n"
+      apktool d -r -s $apk &> /dev/null
+    printf "Extracted $(echo $apk | sed 's/.apk//g') successfully..\n"
+fi
+}
+
+compressapk() {
+read -p "Path to compress: " apkcompress
+if [[ -z $apkcompress ]]; then
+    printf "You must provide a path name..\n"
+else
+    printf "Compressing $apkcompress, please wait\n"
+apktool b -f -d $apkcompress &> /dev/null
+    printf "Compressed $(echo $apkcompress | sed 's/.apk//g') successfully..\n"
+    printf "You can sign $apkcompress.apk now.."
+fi
+mv $apkcompress/dist/*.apk .
+
+}
+
+signapk() {
+read -p "APK To Sign: " apksign
+printf "Please wait, trying to sign $apksign\n"
+   jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore wuseman.keystore $apksign wuseman
+if [[ $? -eq 0 ]]; then
+printf "\nSuccessfully signed $apksign\n\n"
+
+  read -p "Do you want to install $apksign (y/n): " installapk
+if [[ $installapk = "y" ]]; then
+   echo "Please wait, installing $apksign\n" 
+   adb install $installapk
+   printf "Successfully installed $installapk\n"
+   exit
+else
+   sleep 0 
+fi
+fi
+}
+
+
+key
+
+
+if [[ -z $1 ]]; then
+usage
+fi
+
+
+while getopts ":ecshv" getopt; do
+case $getopt in
+      -c) compressapk ;;
+      -e) extractapk  ;;
+      -s) signapk ;;
+      -h) usage ;;
+      -v) echo Version: $version ;;
+      -*) echo "Duh! $OPTARG is not a valid option" ;;
+esac
+done
+
+shift $((OPTIND-1))
+
